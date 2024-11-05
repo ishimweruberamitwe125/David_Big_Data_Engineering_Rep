@@ -1,0 +1,208 @@
+{
+	"jobConfig": {
+		"name": "firstjoin",
+		"description": "",
+		"role": "arn:aws:iam::253490768371:role/service-role/AWSGlueServiceRole-glue",
+		"command": "glueetl",
+		"version": "4.0",
+		"runtime": null,
+		"workerType": "G.1X",
+		"numberOfWorkers": 10,
+		"maxCapacity": 10,
+		"jobRunQueuingEnabled": false,
+		"maxRetries": 0,
+		"timeout": 2880,
+		"maxConcurrentRuns": 1,
+		"security": "none",
+		"scriptName": "firstjoin.py",
+		"scriptLocation": "s3://aws-glue-assets-253490768371-us-east-1/scripts/",
+		"language": "python-3",
+		"spark": false,
+		"sparkConfiguration": "standard",
+		"jobParameters": [],
+		"tags": [],
+		"jobMode": "DEVELOPER_MODE",
+		"createdOn": "2024-10-30T16:37:05.469Z",
+		"developerMode": true,
+		"connectionsList": [],
+		"temporaryDirectory": "s3://aws-glue-assets-253490768371-us-east-1/temporary/",
+		"logging": true,
+		"glueHiveMetastore": true,
+		"etlAutoTuning": true,
+		"metrics": true,
+		"observabilityMetrics": true,
+		"bookmark": "job-bookmark-disable",
+		"sparkPath": "s3://aws-glue-assets-253490768371-us-east-1/sparkHistoryLogs/",
+		"flexExecution": false,
+		"minFlexWorkers": null,
+		"maintenanceWindow": null
+	},
+	"dag": {
+		"node-1730305140976": {
+			"nodeId": "node-1730305140976",
+			"dataPreview": false,
+			"previewAmount": 0,
+			"inputs": [],
+			"name": "AWS Glue Data Catalog",
+			"generatedNodeName": "AWSGlueDataCatalog_node1730305140976",
+			"classification": "DataSource",
+			"type": "Catalog",
+			"isCatalog": true,
+			"database": "testdbproject",
+			"table": "past_sales",
+			"calculatedType": "",
+			"runtimeParameters": [],
+			"codeGenVersion": 2
+		},
+		"node-1730305545391": {
+			"nodeId": "node-1730305545391",
+			"dataPreview": false,
+			"previewAmount": 0,
+			"inputs": [
+				"node-1730305140976"
+			],
+			"name": "Renamed keys for Join",
+			"generatedNodeName": "RenamedkeysforJoin_node1730305545391",
+			"classification": "Transform",
+			"type": "ApplyMapping",
+			"mapping": [
+				{
+					"toKey": "right_store",
+					"fromPath": [
+						"store"
+					],
+					"toType": "long",
+					"fromType": "long",
+					"dropped": false,
+					"children": null
+				},
+				{
+					"toKey": "right_dept",
+					"fromPath": [
+						"dept"
+					],
+					"toType": "long",
+					"fromType": "long",
+					"dropped": false,
+					"children": null
+				},
+				{
+					"toKey": "right_date",
+					"fromPath": [
+						"date"
+					],
+					"toType": "string",
+					"fromType": "string",
+					"dropped": false,
+					"children": null
+				},
+				{
+					"toKey": "right_weekly_sales",
+					"fromPath": [
+						"weekly_sales"
+					],
+					"toType": "double",
+					"fromType": "double",
+					"dropped": false,
+					"children": null
+				},
+				{
+					"toKey": "right_isholiday",
+					"fromPath": [
+						"isholiday"
+					],
+					"toType": "boolean",
+					"fromType": "boolean",
+					"dropped": false,
+					"children": null
+				}
+			],
+			"parentsValid": true,
+			"calculatedType": "",
+			"codeGenVersion": 2
+		},
+		"node-1730305112908": {
+			"nodeId": "node-1730305112908",
+			"dataPreview": false,
+			"previewAmount": 0,
+			"inputs": [],
+			"name": "AWS Glue Data Catalog",
+			"generatedNodeName": "AWSGlueDataCatalog_node1730305112908",
+			"classification": "DataSource",
+			"type": "Catalog",
+			"isCatalog": true,
+			"database": "testdbproject",
+			"table": "features",
+			"calculatedType": "",
+			"runtimeParameters": [],
+			"codeGenVersion": 2
+		},
+		"node-1730305133845": {
+			"nodeId": "node-1730305133845",
+			"dataPreview": false,
+			"previewAmount": 0,
+			"inputs": [
+				"node-1730305112908",
+				"node-1730305545391"
+			],
+			"name": "Join",
+			"generatedNodeName": "Join_node1730305133845",
+			"classification": "Transform",
+			"type": "Join",
+			"joinType": "right",
+			"columns": [
+				{
+					"from": "node-1730305112908",
+					"keys": [
+						"store"
+					]
+				},
+				{
+					"from": "node-1730305545391",
+					"keys": [
+						"right_store"
+					]
+				}
+			],
+			"columnConditions": [
+				"="
+			],
+			"parentsValid": true,
+			"calculatedType": "",
+			"codeGenVersion": 2
+		},
+		"node-1730305924649": {
+			"nodeId": "node-1730305924649",
+			"dataPreview": false,
+			"previewAmount": 0,
+			"inputs": [
+				"node-1730305133845"
+			],
+			"name": "Amazon S3",
+			"generatedNodeName": "AmazonS3_node1730305924649",
+			"classification": "DataSink",
+			"type": "S3",
+			"streamingBatchInterval": 100,
+			"format": "glueparquet",
+			"compression": "uncompressed",
+			"path": "s3://mydavid125/curatedgold/",
+			"partitionKeys": [],
+			"schemaChangePolicy": {
+				"enableUpdateCatalog": true,
+				"updateBehavior": "UPDATE_IN_DATABASE",
+				"database": "testdbproject",
+				"table": "firstjoin"
+			},
+			"updateCatalogOptions": "schemaAndPartitions",
+			"autoDataQuality": {
+				"isEnabled": false,
+				"evaluationContext": null
+			},
+			"calculatedType": "",
+			"codeGenVersion": 2
+		}
+	},
+	"hasBeenSaved": false,
+	"usageProfileName": null,
+	"script": "import sys\r\nfrom awsglue.transforms import *\r\nfrom awsglue.utils import getResolvedOptions\r\nfrom pyspark.context import SparkContext\r\nfrom awsglue.context import GlueContext\r\nfrom awsglue.job import Job\r\nfrom awsglue.dynamicframe import DynamicFrame\r\nfrom pyspark.sql.functions import to_date\r\n\r\nargs = getResolvedOptions(sys.argv, ['JOB_NAME'])\r\nsc = SparkContext()\r\nglueContext = GlueContext(sc)\r\nspark = glueContext.spark_session\r\njob = Job(glueContext)\r\njob.init(args['JOB_NAME'], args)\r\n\r\n# Load features table with CSV format and apply date format conversion\r\nfeatures_df = glueContext.create_dynamic_frame.from_options(\r\n    connection_type=\"s3\",\r\n    connection_options={\r\n        \"paths\": [\"s3://mydavid125/curatedgold/features/\"],\r\n        \"recurse\": True\r\n    },\r\n    format=\"csv\",\r\n    format_options={\r\n        \"withHeader\": True,\r\n        \"separator\": \",\"\r\n    },\r\n    transformation_ctx=\"features\"\r\n).toDF()\r\n\r\n# Convert 'date' column in features to date format\r\nfeatures_df = features_df.withColumn(\"date\", to_date(features_df[\"date\"], \"yyyy-MM-dd\"))\r\n\r\n# Load past_sales table and apply date format conversion\r\npast_sales_df = glueContext.create_dynamic_frame.from_options(\r\n    connection_type=\"s3\",\r\n    connection_options={\r\n        \"paths\": [\"s3://mydavid125/curatedgold/past_sales/\"],\r\n        \"recurse\": True\r\n    },\r\n    format=\"csv\",\r\n    format_options={\r\n        \"withHeader\": True,\r\n        \"separator\": \",\"\r\n    },\r\n    transformation_ctx=\"past_sales\"\r\n).toDF()\r\n\r\n# Convert 'date' column in past_sales to date format and rename columns for unique identification\r\npast_sales_df = past_sales_df.withColumn(\"past_date\", to_date(past_sales_df[\"date\"], \"yyyy-MM-dd\")) \\\r\n                             .withColumnRenamed(\"store\", \"past_store\") \\\r\n                             .withColumnRenamed(\"dept\", \"past_dept\") \\\r\n                             .withColumnRenamed(\"weekly_sales\", \"past_weekly_sales\") \\\r\n                             .withColumnRenamed(\"isholiday\", \"past_isholiday\") \\\r\n                             .drop(\"date\")\r\n\r\n# Load store table\r\nstore_df = glueContext.create_dynamic_frame.from_options(\r\n    connection_type=\"s3\",\r\n    connection_options={\r\n        \"paths\": [\"s3://mydavid125/curatedgold/store/\"],\r\n        \"recurse\": True\r\n    },\r\n    format=\"csv\",\r\n    format_options={\r\n        \"withHeader\": True,\r\n        \"separator\": \",\"\r\n    },\r\n    transformation_ctx=\"store\"\r\n).toDF()\r\n\r\n# Rename 'store' column in store_df for unique identification\r\nstore_df = store_df.withColumnRenamed(\"store\", \"store_info\")\r\n\r\n# Perform left join on past_sales and features (keeping all past_sales rows)\r\npast_sales_features_joined = past_sales_df.join(\r\n    features_df,\r\n    (past_sales_df[\"past_store\"] == features_df[\"store\"]) & (past_sales_df[\"past_date\"] == features_df[\"date\"]),\r\n    \"left\"\r\n)\r\n\r\n# Perform another left join with store data\r\nfinal_df = past_sales_features_joined.join(\r\n    store_df,\r\n    past_sales_features_joined[\"past_store\"] == store_df[\"store_info\"],\r\n    \"left\"\r\n).dropna()\r\n\r\n# Coalesce the DataFrame to a single partition to ensure only one file\r\nfinal_df = final_df.coalesce(1)\r\n\r\n# Convert the final result to DynamicFrame for Glue compatibility\r\nfinal_dynamic_frame = DynamicFrame.fromDF(final_df, glueContext, \"final\")\r\n\r\n# Write the final DynamicFrame to S3 in CSV format\r\nsink = glueContext.getSink(\r\n    path=\"s3://mydavid125/curatedgold/final/\",\r\n    connection_type=\"s3\",\r\n    updateBehavior=\"UPDATE_IN_DATABASE\",\r\n    partitionKeys=[],\r\n    enableUpdateCatalog=True,\r\n    transformation_ctx=\"sink\"\r\n)\r\nsink.setCatalogInfo(catalogDatabase=\"testdbproject\", catalogTableName=\"final\")\r\nsink.setFormat(\"csv\")\r\nsink.writeFrame(final_dynamic_frame)\r\n\r\njob.commit()\r\n"
+}

@@ -1,0 +1,302 @@
+CREATE EXTERNAL SCHEMA davidpro
+FROM DATA CATALOG 
+DATABASE 'davidproject'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+CREATE EXTERNAL DATABASE IF NOT EXISTS;
+
+CREATE EXTERNAL TABLE davidpro.features (
+    store BIGINT,
+    date VARCHAR(50),
+    temperature DOUBLE PRECISION,
+    fuel_price DOUBLE PRECISION,
+    markdown1 DOUBLE PRECISION,
+    markdown2 DOUBLE PRECISION,
+    markdown3 DOUBLE PRECISION,
+    markdown4 DOUBLE PRECISION,
+    markdown5 DOUBLE PRECISION,
+    cpi DOUBLE PRECISION,
+    unemployment DOUBLE PRECISION,
+    isholiday BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/features/';
+
+CREATE EXTERNAL TABLE davidpro.store (
+    store BIGINT,
+    type VARCHAR(50),
+    size BIGINT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/store/';
+
+CREATE EXTERNAL TABLE davidpro.past_sales (
+    store BIGINT,
+    dept BIGINT,
+    date VARCHAR(50),
+    weekly_sales DOUBLE PRECISION,
+    isholiday BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/past_sales/';
+
+CREATE EXTERNAL TABLE davidpro.new_sales (
+    store BIGINT,
+    dept BIGINT,
+    date VARCHAR(50),
+    weekly_sales DOUBLE PRECISION,
+    isholiday BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/new_sales/';
+
+CREATE EXTERNAL TABLE davidpro.dim_store (
+    store_id BIGINT,
+    store_type VARCHAR(50),
+    store_size BIGINT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_store/';
+
+CREATE EXTERNAL TABLE davidpro.dim_date (
+    date_id DATE,
+    year INT,
+    month INT,
+    day INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_date/';
+
+CREATE EXTERNAL TABLE davidpro.dim_department (
+    dept_id BIGINT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_department/';
+
+CREATE EXTERNAL TABLE davidpro.dim_holiday (
+    holiday_id BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_holiday/';
+
+CREATE EXTERNAL TABLE davidpro.dim_features (
+    feature_id BIGINT,
+    temperature DOUBLE PRECISION,
+    fuel_price DOUBLE PRECISION,
+    markdown1 DOUBLE PRECISION,
+    markdown2 DOUBLE PRECISION,
+    markdown3 DOUBLE PRECISION,
+    markdown4 DOUBLE PRECISION,
+    markdown5 DOUBLE PRECISION,
+    cpi DOUBLE PRECISION,
+    unemployment DOUBLE PRECISION
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_features/';
+
+CREATE EXTERNAL TABLE davidpro.fact_sales (
+    store_id BIGINT,
+    dept_id BIGINT,
+    date_id DATE,
+    feature_id BIGINT,
+    weekly_sales DOUBLE PRECISION,
+    holiday_id BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/fact_sales/';
+
+CREATE TEMP TABLE temp_dim_store AS
+SELECT DISTINCT store AS store_id,
+       type AS store_type,
+       size AS store_size
+FROM davidpro.store;
+
+CREATE TEMP TABLE temp_dim_date AS
+SELECT DISTINCT
+    NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE AS date_id,
+    EXTRACT(YEAR FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS year,
+    EXTRACT(MONTH FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS month,
+    EXTRACT(DAY FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS day
+FROM davidpro.past_sales
+UNION
+SELECT DISTINCT
+    NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE AS date_id,
+    EXTRACT(YEAR FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS year,
+    EXTRACT(MONTH FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS month,
+    EXTRACT(DAY FROM NULLIF(CASE
+        WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date
+        ELSE NULL
+    END, '')::DATE) AS day
+FROM davidpro.new_sales;
+
+CREATE TEMP TABLE temp_dim_department AS
+SELECT DISTINCT dept AS dept_id
+FROM davidpro.past_sales;
+
+CREATE TEMP TABLE temp_dim_holiday AS
+SELECT DISTINCT isholiday AS holiday_id
+FROM davidpro.past_sales
+UNION
+SELECT DISTINCT isholiday AS holiday_id
+FROM davidpro.new_sales;
+
+CREATE TEMP TABLE temp_dim_features AS
+SELECT DISTINCT ROW_NUMBER() OVER() AS feature_id,
+       temperature,
+       fuel_price,
+       markdown1,
+       markdown2,
+       markdown3,
+       markdown4,
+       markdown5,
+       cpi,
+       unemployment
+FROM davidpro.features;
+
+CREATE TEMP TABLE temp_fact_sales AS
+SELECT ps.store AS store_id,
+       ps.dept AS dept_id,
+       CAST(ps.date AS DATE) AS date_id,
+       f.feature_id,
+       ps.weekly_sales,
+       ps.isholiday AS holiday_id
+FROM davidpro.past_sales AS ps
+JOIN temp_dim_features AS f ON ps.store = f.feature_id
+JOIN temp_dim_store AS s ON ps.store = s.store_id
+JOIN temp_dim_date AS d ON CAST(ps.date AS DATE) = d.date_id
+UNION ALL
+SELECT ns.store AS store_id,
+       ns.dept AS dept_id,
+       CAST(ns.date AS DATE) AS date_id,
+       f.feature_id,
+       ns.weekly_sales,
+       ns.isholiday AS holiday_id
+FROM davidpro.new_sales AS ns
+JOIN temp_dim_features AS f ON ns.store = f.feature_id
+JOIN temp_dim_store AS s ON ns.store = s.store_id
+JOIN temp_dim_date AS d ON CAST(ns.date AS DATE) = d.date_id;
+
+UNLOAD ('SELECT * FROM temp_dim_store')
+TO 's3://mydavid125/curatedgold/dim_store/'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+DELIMITER ','
+ALLOWOVERWRITE
+PARALLEL OFF;
+
+UNLOAD ('SELECT * FROM temp_dim_date')
+TO 's3://mydavid125/curatedgold/dim_date/'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+DELIMITER ','
+ALLOWOVERWRITE
+PARALLEL OFF;
+
+UNLOAD ('SELECT * FROM temp_dim_department')
+TO 's3://mydavid125/curatedgold/dim_department/'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+DELIMITER ','
+ALLOWOVERWRITE
+PARALLEL OFF;
+
+UNLOAD ('SELECT * FROM temp_dim_holiday')
+TO 's3://mydavid125/curatedgold/dim_holiday/'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+DELIMITER ','
+ALLOWOVERWRITE
+PARALLEL OFF;
+
+UNLOAD ('SELECT * FROM temp_fact_sales')
+TO 's3://mydavid125/curatedgold/fact_sales/'
+IAM_ROLE 'arn:aws:iam::253490768371:role/service-role/AmazonRedshift-CommandsAccessRole-20241029T094628'
+DELIMITER ','
+ALLOWOVERWRITE
+PARALLEL OFF;
+
+CREATE EXTERNAL TABLE davidpro.dim_store (
+    store_id BIGINT,
+    store_type VARCHAR(50),
+    store_size BIGINT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/dim_store/';
+
+select * from davidpro.dim_store limit 10;
+drop table davidpro.fact_sales;
+CREATE EXTERNAL TABLE davidpro.fact_sales (
+    store_id BIGINT,
+    dept_id BIGINT,
+    date_id DATE,
+    feature_id BIGINT,
+    weekly_sales DOUBLE PRECISION,
+    holiday_id BOOLEAN
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://mydavid125/curatedgold/fact_sales/';
+
+select * from davidpro.fact_sales limit 10;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
